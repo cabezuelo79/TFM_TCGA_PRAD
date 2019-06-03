@@ -4,8 +4,31 @@
 ###### Analisis de expresion diferencial con el paquete edgeR#
 ##############################################################
 
-# Establecimiento de directorio de trabajo, donde se encuentra el archivo "PAREADO.txt"
-setwd('C:/Users/JoseMaria/OneDrive - MERIDIEM SEEDS S.L/Documentos/Master/TFM/RNASeq_PRAD')
+# Establecimiento de directorio de trabajo, donde se encuentra el archivo "GENERAL.txt"
+dirJM<-"C:/Users/JoseMaria/OneDrive - MERIDIEM SEEDS S.L/Documentos/Master/TFM/RNASeq_PRAD/GitHub/TFM_TCGA_PRAD"
+dirEdu<-"/Users/eandres/Proyectos/Eduardo_Andres/TFM_Cabezuelo/Cabezuelo/TFM_TCGA_PRAD"
+setwd(dirEdu)
+setwd(dirJM)
+
+mapPathwayToName <- function(organism) {
+  KEGG_PATHWAY_LIST_BASE <- "http://rest.kegg.jp/list/pathway/"
+  pathway_list_REST_url <- paste(KEGG_PATHWAY_LIST_BASE, organism, sep="")
+  
+  pathway_id_name <- data.frame()
+  cont<-0
+  for (line in readLines(pathway_list_REST_url)) {
+    cont<-cont+1
+    tmp <- strsplit(line, "\t")[[1]]
+    pathway_id <- strsplit(tmp[1], organism)[[1]][2]
+    pathway_name <- tmp[2]
+    pathway_name <- strsplit(pathway_name, "\\s+-\\s+")[[1]][1]
+    pathway_id_name[cont, 1] = pathway_id
+    pathway_id_name[cont, 2] = pathway_name
+    
+  }
+  names(pathway_id_name) <- c("path","pathway_name")
+  pathway_id_name
+}
 
 # Cargo el paquete necesario para la ejecución del analisis
 library(edgeR)
@@ -13,8 +36,18 @@ library(edgeR)
 # Obtengo la información del archivo "PAREADO.txt" 
 rawdataPAR <- read.delim("PAREADO.txt", check.names=FALSE, stringsAsFactors=FALSE)
 
+#incluyo el nombre de los genes como rowname
+rownames(rawdataPAR)<-rawdataPAR$SYMBOL
+
+#Obtengo el tamaño de cada gen para normalizar teniendo en ceunta del tamaño de los genes
+gene.length_PAR<-read.table("his-Size.tab",header=T)
+idx_PAR<-match(rawdataPAR$SYMBOL,gene.length_PAR$Gene)
+results_counts_PAR<-gene.length_PAR[idx_PAR,]
+results_counts_PAR[is.na(results_counts_PAR$Length),"Length"]<-0
+nrow(results_counts_PAR)
+
 # Construyo un objeto DGEList con la información del archivo, las dos primeras columnas son el simbolo e identidad de los genes, el resto las muestras
-yPAR <- DGEList(counts=rawdataPAR[,3:106], genes=rawdataPAR[,1:2])
+yPAR <- DGEList(counts=rawdataPAR[,3:106], genes=results_counts_PAR)
 
 # Llevo a cabo la normalizacion de las muestras
 yPAR <- calcNormFactors(yPAR)
@@ -67,20 +100,20 @@ head(targetsPAR)
 targetsPAR$filename<-as.character(targetsPAR$filename)
 
 # Genero la media de counts para el primero de los genes diferencialmente expresados y tejido normal
-controlPAR <- mean(as.numeric(yPAR$counts[yPAR$genes$`SYMBOL`=="TRIP6",targetsPAR[targetsPAR$type=="N","filename"]])) 
+controlPAR <- mean(as.numeric(yPAR$counts["TRIP6",targetsPAR[targetsPAR$type=="N","filename"]])) 
 
 # Visualizo el resultado
 controlPAR
 
 # Genero la media de counts para el primero de los genes diferencialmente expresados y tejido tumoral
-samplePAR <- mean(as.numeric(yPAR$counts[yPAR$genes$`SYMBOL`=="TRIP6",targetsPAR[targetsPAR$type=="T","filename"]])) 
+samplePAR <- mean(as.numeric(yPAR$counts["TRIP6",targetsPAR[targetsPAR$type=="T","filename"]])) 
 
 # Visualizo el resultado
 samplePAR
 
 # Realizo el calculo de logFC manualmente
 log2(samplePAR/controlPAR)
-
+top_PAR$table["TRIP6","logFC"]
 
 
 ##############################################################################################
@@ -92,10 +125,10 @@ library(goseq)
 library(GO.db)
 
 # Genero un vector con los genes diferencialmente expresados (FDR < 0.05)
-topPAR_DE <- top_PAR$table[top_PAR$table$FDR < 0.05,"SYMBOL"]
+topPAR_DE <- top_PAR$table[top_PAR$table$FDR < 0.05,"Gene"]
 
 # Genero un vector 'universal' que contiene tanto los genes DE como los no DE
-universePAR <- top_PAR$table$`SYMBOL`
+universePAR <- as.vector(unique(na.omit(top_PAR$table$Gene)))
 
 # Construyo un vector apropiado para el analisis con 'goseq'
 mytablePAR <- as.integer(unique(universePAR)%in%topPAR_DE)
@@ -114,11 +147,16 @@ head(pwf_PAR)
 # Realizo el analisis GO mediante la aproximación de Wallenius
 GO.wall_PAR=goseq(pwf_PAR,"hg19","geneSymbol")
 
-# Visualizo el resultado
-GO.wall_PAR
+# Copio el resultado a tabla .tsv
+write.table(GO.wall_PAR, file = 'Go.PAREADO.tsv', quote = FALSE, sep = '\t', col.names = NA)
 
 # Llevo a cabo el enriquecimiento
 enriched.GO_PAR <- GO.wall_PAR$category[p.adjust(GO.wall_PAR$over_represented_pvalue, method="BH")<.05]
+
+# Genes under-represented
+length(GO.wall_PAR$category[GO.wall_PAR$under_represented_pvalue<=0.05])
+under.PAR <- GO.wall_PAR[GO.wall_PAR$under_represented_pvalue<=0.05,]
+write.table(under.PAR, file = 'Go.PAREADO_UNDER.tsv', quote = FALSE, sep = '\t', col.names = NA)
 
 # Visualizo el resultado
 for(go in enriched.GO_PAR[1:10]){
@@ -126,9 +164,17 @@ for(go in enriched.GO_PAR[1:10]){
   cat("--------------------------------------\n")
 }
 
+
+
 ##### ANALISIS DE RUTAS KEGG #########
 
 kegg_DE_PAR <- goseq(pwf_PAR,'hg19','geneSymbol',test.cats="KEGG")
-
+kegg_path_PAR<-mapPathwayToName("hsa")
+idx_PAR<-match(kegg_DE_PAR$category,kegg_path_PAR$path)
+pathway_name_PAR<-kegg_path_PAR[idx_PAR,2]
+data_PAR<-cbind(kegg_DE_PAR,pathway_name_PAR)
 # Visualizo el resultado
-kegg_DE_PAR
+head(data_PAR)
+
+# copio el resultado en una tabla .tsv
+write.table(data_PAR, file = 'kegg_pathways_PAREADO.tsv', quote = FALSE, sep = '\t', col.names = NA)

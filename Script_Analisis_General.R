@@ -140,6 +140,7 @@ enriched.GO <- GO.wall$category[p.adjust(GO.wall$over_represented_pvalue, method
 
 ####Y que pasa con los under_represented ?
 length(GO.wall$category[GO.wall$under_represented_pvalue<=0.05])
+head(GO.wall[GO.wall$under_represented_pvalue<=0.05,])
 
 # Visualizo el resultado
 for(go in enriched.GO[1:10]){

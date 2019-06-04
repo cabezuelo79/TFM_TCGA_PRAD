@@ -158,7 +158,7 @@ enriched.over.GO.BP <- GO.BP[GO.BP$FDRover<=0.05,]
 enriched.over.GO.CC <- GO.CC[GO.CC$FDRover<=0.05,]
 enriched.over.GO.MF <- GO.MF[GO.MF$FDRover<=0.05,]
 
-# under-expressed
+# Genes under-expressed
 enriched.under.GO.BP <- GO.BP[GO.BP$FDRunder<=0.05,]
 write.table(enriched.under.GO.BP, file = 'GO.biological.process_under.tsv', sep = "\t", row.names = FALSE)
 enriched.under.GO.CC <- GO.CC[GO.CC$FDRunder<=0.05,]
@@ -187,7 +187,7 @@ write.table(data, file = 'KEGG.PATHWAYS.tsv', sep = "\t", row.names = FALSE)
 # guardo los que tienen un FDRover <= 0.05
 enriched.KEGG <- data[data$FDRover<=0.05,]
 
-# under-expressed
+# Genes under-expressed
 under.KEGG <- data[data$FDRunder<=0.05,]
 write.table(under.KEGG, file = 'KEGG.PATHWAYS_under.tsv', sep = "\t", row.names = FALSE)
 

@@ -135,60 +135,44 @@ pwf=nullp(mytable,"hg19","geneSymbol")
 head(pwf)
 
 # Realizo el analisis GO mediante la aproximación de Wallenius
-GO.BP=goseq(pwf,"hg19","geneSymbol",method = "Wallenius", test.cats = "GO:BP")
-GO.CC=goseq(pwf,"hg19","geneSymbol",method = "Wallenius", test.cats = "GO:CC")
-GO.MF=goseq(pwf,"hg19","geneSymbol",method = "Wallenius", test.cats = "GO:MF")
+GO.wall=goseq(pwf,"hg19","geneSymbol", test.cats = c("GO:BP","GO:CC","GO:MF"))
 
-# Visualizo el resultado
-head(GO.BP)
-head(GO.CC)
-head(GO.MF)
+# Separo los terminos GO y creo FDRdown y FDRover
+GO.BP <- GO.wall[GO.wall$ontology=="BP",]
+GO.BP$FDRunder <- p.adjust(GO.BP$under_represented_pvalue, n=nrow(GO.BP))
+GO.BP$FDRover <- p.adjust(GO.BP$over_represented_pvalue, n=nrow(GO.BP))
 
-# Copio el resultado en tablas .tsv
-write.table(GO.BP, file = 'Go.Biological.Process.tsv', quote = FALSE, sep = '\t', col.names = NA)
-write.table(GO.CC, file = 'Go.Cellular.Component.tsv', quote = FALSE, sep = '\t', col.names = NA)
-write.table(GO.MF, file = 'Go.Molecular.Function.tsv', quote = FALSE, sep = '\t', col.names = NA)
+GO.CC <- GO.wall[GO.wall$ontology=="CC",]
+GO.CC$FDRunder <- p.adjust(GO.CC$under_represented_pvalue, n=nrow(GO.CC))
+GO.CC$FDRover <- p.adjust(GO.CC$over_represented_pvalue, n=nrow(GO.CC))
 
-# Llevo a cabo el enriquecimiento
-enriched.GO.BP <- GO.BP$category[p.adjust(GO.BP$over_represented_pvalue, method="BH")<.05]
-enriched.GO.CC <- GO.CC$category[p.adjust(GO.CC$over_represented_pvalue, method="BH")<.05]
-enriched.GO.MF <- GO.MF$category[p.adjust(GO.MF$over_represented_pvalue, method="BH")<.05]
+GO.MF <- GO.wall[GO.wall$ontology=="MF",]
+GO.MF$FDRunder <- p.adjust(GO.MF$under_represented_pvalue, n=nrow(GO.MF))
+GO.MF$FDRover <- p.adjust(GO.MF$over_represented_pvalue, n=nrow(GO.MF))
 
-# Genes under_represented 
-length(GO.BP$category[GO.BP$under_represented_pvalue<=0.05])
-under.BP <- GO.BP[GO.BP$under_represented_pvalue<=0.05,]
-
-length(GO.CC$category[GO.CC$under_represented_pvalue<=0.05])
-under.CC <- GO.CC[GO.CC$under_represented_pvalue<=0.05,]
-
-length(GO.MF$category[GO.MF$under_represented_pvalue<=0.05])
-under.MF <- GO.MF[GO.MF$under_represented_pvalue<=0.05,]
-
-# Copio el resultado en tablas .tsv
-write.table(under.BP, file = 'Go.Biological.Process_UNDER.tsv', quote = FALSE, sep = '\t', col.names = NA)
-write.table(under.CC, file = 'Go.Cellular.Component_UNDER.tsv', quote = FALSE, sep = '\t', col.names = NA)
-write.table(under.MF, file = 'Go.Molecular.Function_UNDER.tsv', quote = FALSE, sep = '\t', col.names = NA)
+# Guardo los FDR <= 0.05
+enriched.over.GO.BP <- GO.BP[GO.BP$FDRover<=0.05,]
+write.table(enriched.over.GO.BP, file = 'GO.biological.process.tsv', sep = "\t", row.names = FALSE)
+enriched.over.GO.CC <- GO.CC[GO.CC$FDRover<=0.05,]
+write.table(enriched.over.GO.CC, file = 'GO.cellular.component.tsv', sep = "\t", row.names = FALSE)
+enriched.over.GO.MF <- GO.MF[GO.MF$FDRover<=0.05,]
+write.table(enriched.over.GO.MF, file = 'GO.molecular.function.tsv', sep = "\t", row.names = FALSE)
+enriched.under.GO.BP <- GO.BP[GO.BP$FDRunder<=0.05,]
+write.table(enriched.under.GO.BP, file = 'GO.biological.process_under.tsv', sep = "\t", row.names = FALSE)
+enriched.under.GO.CC <- GO.CC[GO.CC$FDRunder<=0.05,]
+write.table(enriched.under.GO.CC, file = 'GO.cellular.component_under.tsv', sep = "\t", row.names = FALSE)
+enriched.under.GO.MF <- GO.MF[GO.MF$FDRunder<=0.05,]
+write.table(enriched.under.GO.MF, file = 'GO.molecular.function_under.tsv', sep = "\t", row.names = FALSE)
 
 
-# Visualizo el resultado
-for(go in enriched.GO.BP[1:10]){
-      print(GOTERM[[go]])
-      cat("--------------------------------------\n")
-}
 
-for(go in enriched.GO.CC[1:10]){
-  print(GOTERM[[go]])
-  cat("--------------------------------------\n")
-}
-
-for(go in enriched.GO.MF[1:10]){
-  print(GOTERM[[go]])
-  cat("--------------------------------------\n")
-}
 
 ##### ANALISIS DE RUTAS KEGG #########
 
 kegg_DE <- goseq(pwf,'hg19','geneSymbol',test.cats="KEGG")
+kegg_DE$FDRunder <- p.adjust(kegg_DE$under_represented_pvalue, n=nrow(kegg_DE))
+kegg_DE$FDRover <- p.adjust(kegg_DE$over_represented_pvalue, n=nrow(kegg_DE))
+
 kegg_path<-mapPathwayToName("hsa")
 idx<-match(kegg_DE$category,kegg_path$path)
 pathway_name<-kegg_path[idx,2]
@@ -196,6 +180,9 @@ data<-cbind(kegg_DE,pathway_name)
 # Visualizo el resultado
 head(data)
 
-# copio el resultado en una tabla .tsv
-write.table(data, file = 'kegg_pathways.tsv', quote = FALSE, sep = '\t', col.names = NA)
+enriched.KEGG <- data[data$FDRover<=0.05,]
+write.table(enriched.KEGG, file = 'KEGG.PATHWAYS.tsv', sep = "\t", row.names = FALSE)
+under.KEGG <- data[data$FDRunder<=0.05,]
+write.table(under.KEGG, file = 'KEGG.PATHWAYS_under.tsv', sep = "\t", row.names = FALSE)
+
 

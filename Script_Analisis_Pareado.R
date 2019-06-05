@@ -145,36 +145,59 @@ pwf_PAR=nullp(mytablePAR,"hg19","geneSymbol")
 head(pwf_PAR)
 
 # Realizo el analisis GO mediante la aproximación de Wallenius
-GO.wall_PAR=goseq(pwf_PAR,"hg19","geneSymbol")
+GO.wall_PAR=goseq(pwf_PAR,"hg19","geneSymbol", test.cats = c("GO:BP","GO:CC","GO:MF"))
 
-# Copio el resultado a tabla .tsv
-write.table(GO.wall_PAR, file = 'Go.PAREADO.tsv', quote = FALSE, sep = '\t', col.names = NA)
+# Separo los terminos GO y creo FDRunder y FDRover
+GO.BP.PAR <- GO.wall_PAR[GO.wall_PAR$ontology=="BP",]
+GO.BP.PAR$FDRunder <- p.adjust(GO.BP.PAR$under_represented_pvalue, n=nrow(GO.BP.PAR))
+GO.BP.PAR$FDRover <- p.adjust(GO.BP.PAR$over_represented_pvalue, n=nrow(GO.BP.PAR))
+write.table(GO.BP.PAR, file = 'GO.biological.process_PAREADO.tsv', sep = "\t", row.names = FALSE)
 
-# Llevo a cabo el enriquecimiento
-enriched.GO_PAR <- GO.wall_PAR$category[p.adjust(GO.wall_PAR$over_represented_pvalue, method="BH")<.05]
+GO.CC.PAR <- GO.wall_PAR[GO.wall_PAR$ontology=="CC",]
+GO.CC.PAR$FDRunder <- p.adjust(GO.CC.PAR$under_represented_pvalue, n=nrow(GO.CC.PAR))
+GO.CC.PAR$FDRover <- p.adjust(GO.CC.PAR$over_represented_pvalue, n=nrow(GO.CC.PAR))
+write.table(GO.CC.PAR, file = 'GO.cellular.component_PAREADO.tsv', sep = "\t", row.names = FALSE)
 
-# Genes under-represented
-length(GO.wall_PAR$category[GO.wall_PAR$under_represented_pvalue<=0.05])
-under.PAR <- GO.wall_PAR[GO.wall_PAR$under_represented_pvalue<=0.05,]
-write.table(under.PAR, file = 'Go.PAREADO_UNDER.tsv', quote = FALSE, sep = '\t', col.names = NA)
+GO.MF.PAR <- GO.wall_PAR[GO.wall_PAR$ontology=="MF",]
+GO.MF.PAR$FDRunder <- p.adjust(GO.MF.PAR$under_represented_pvalue, n=nrow(GO.MF.PAR))
+GO.MF.PAR$FDRover <- p.adjust(GO.MF.PAR$over_represented_pvalue, n=nrow(GO.MF.PAR))
+write.table(GO.MF.PAR, file = 'GO.molecular.function_PAREADO.tsv', sep = "\t", row.names = FALSE)
 
-# Visualizo el resultado
-for(go in enriched.GO_PAR[1:10]){
-  print(GOTERM[[go]])
-  cat("--------------------------------------\n")
-}
+# Guardo los FDR <= 0.05
+enriched.over.GO.BP.PAR <- GO.BP[GO.BP$FDRover<=0.05,]
+enriched.over.GO.CC.PAR <- GO.CC[GO.CC$FDRover<=0.05,]
+enriched.over.GO.MF.PAR <- GO.MF[GO.MF$FDRover<=0.05,]
+
+# Genes under-expressed
+enriched.under.GO.BP.PAR <- GO.BP.PAR[GO.BP.PAR$FDRunder<=0.05,]
+write.table(enriched.under.GO.BP.PAR, file = 'GO.biological.process_under_PAREADO.tsv', sep = "\t", row.names = FALSE)
+enriched.under.GO.CC.PAR <- GO.CC.PAR[GO.CC.PAR$FDRunder<=0.05,]
+write.table(enriched.under.GO.CC.PAR, file = 'GO.cellular.component_under_PAREADO.tsv', sep = "\t", row.names = FALSE)
+enriched.under.GO.MF.PAR <- GO.MF.PAR[GO.MF.PAR$FDRunder<=0.05,]
+write.table(enriched.under.GO.MF.PAR, file = 'GO.molecular.function_under_PAREADO.tsv', sep = "\t", row.names = FALSE)
 
 
 
 ##### ANALISIS DE RUTAS KEGG #########
 
 kegg_DE_PAR <- goseq(pwf_PAR,'hg19','geneSymbol',test.cats="KEGG")
+kegg_DE_PAR$FDRunder <- p.adjust(kegg_DE_PAR$under_represented_pvalue, n=nrow(kegg_DE_PAR))
+kegg_DE_PAR$FDRover <- p.adjust(kegg_DE_PAR$over_represented_pvalue, n=nrow(kegg_DE_PAR))
+
+
 kegg_path_PAR<-mapPathwayToName("hsa")
 idx_PAR<-match(kegg_DE_PAR$category,kegg_path_PAR$path)
 pathway_name_PAR<-kegg_path_PAR[idx_PAR,2]
 data_PAR<-cbind(kegg_DE_PAR,pathway_name_PAR)
+
 # Visualizo el resultado
 head(data_PAR)
 
-# copio el resultado en una tabla .tsv
-write.table(data_PAR, file = 'kegg_pathways_PAREADO.tsv', quote = FALSE, sep = '\t', col.names = NA)
+write.table(data_PAR, file = 'KEGG.PATHWAYS_PAREADO.tsv', sep = "\t", row.names = FALSE)
+
+# guardo los que tienen un FDRover <= 0.05
+enriched.KEGG.PAR <- data_PAR[data_PAR$FDRover<=0.05,]
+
+# Genes under-expressed
+under.KEGG.PAR <- data_PAR[data_PAR$FDRunder<=0.05,]
+write.table(under.KEGG.PAR, file = 'KEGG.PATHWAYS_under_PAREADO.tsv', sep = "\t", row.names = FALSE)
